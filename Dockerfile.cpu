@@ -1,0 +1,33 @@
+# 票证检测矫正服务 - CPU 镜像
+# 构建:   docker build -f Dockerfile.cpu -t card-correction:cpu .
+# 运行:   docker run --rm -p 8300:8300 -v $(pwd)/saved:/app/saved card-correction:cpu
+FROM python:3.11-slim
+
+# opencv(headless) 运行时依赖
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# 先装 CPU 版 torch(避免拉入 CUDA 轮子), 再装其余依赖
+COPY requirements.txt .
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir -r requirements.txt
+
+# 应用代码 + 模型权重(约124MB)
+COPY app.py test_service.py service_config.json README.md ./
+COPY pytorch_model.pt configuration.json ./
+COPY data ./data
+
+ENV DEVICE=cpu \
+    PORT=8300 \
+    MODELSCOPE_CACHE=/tmp/modelscope \
+    PYTHONUNBUFFERED=1
+
+EXPOSE 8300
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8300/health', timeout=3).status==200 else 1)"
+
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8300", "--workers", "1"]

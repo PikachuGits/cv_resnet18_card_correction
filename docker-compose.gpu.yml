@@ -1,0 +1,41 @@
+# 票证检测矫正服务 - GPU 版
+# 前置:  宿主机需安装 NVIDIA 驱动 + nvidia-container-toolkit
+# 启动:  docker compose -f docker-compose.gpu.yml up -d --build
+# 接口:  http://127.0.0.1:8300
+# 停止:  docker compose -f docker-compose.gpu.yml down
+services:
+  card-correction-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    image: card-correction:gpu
+    container_name: card-correction-gpu
+    environment:
+      DEVICE: gpu
+      # CUDA 不可用时 app.py 自动回退 CPU(日志有 WARNING)
+      NACOS_SERVER_ADDR: 192.168.2.61:8848
+      NACOS_SERVICE_NAME: card-correction
+      NACOS_REGISTER_IP: ${HOST_IP:-192.168.2.61}
+      NACOS_REGISTER_PORT: 8300
+    ports:
+      - "8300:8300"
+    # 如需让 service_config.json 修改在容器重建后保留, 取消下面 volumes 注释
+    # volumes:
+    #   - ./service_config.json:/app/service_config.json
+    restart: unless-stopped
+    # GPU 直通(compose v2 写法); 也可简化为顶层 `gpus: all`
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+        limits:
+          memory: 8G
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8300/health', timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s

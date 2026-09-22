@@ -1,0 +1,28 @@
+# 票证检测矫正 HTTP 服务依赖 (Python 3.13, macOS CPU 实测通过)
+modelscope>=1.40
+torch>=2.6
+fastapi
+uvicorn
+python-multipart
+opencv-python-headless
+pillow
+numpy
+requests
+boto3
+# Nacos SDK: 3.x 走 gRPC (推荐), 1.x 走 HTTP, app.py 自动兼容两者
+# 若想锁老版本: nacos-sdk-python<2
+nacos-sdk-python>=3.0.0
+# modelscope 1.40 精简安装后, pipeline 运行时还需要以下依赖
+addict
+easydict
+simplejson
+sortedcontainers
+oss2
+datasets
+matplotlib
+scipy
+scikit-image
+pandas
+transformers
+timm
+yapf

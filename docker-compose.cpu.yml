@@ -1,0 +1,30 @@
+# 票证检测矫正服务 - CPU 版
+# 启动:  docker compose -f docker-compose.cpu.yml up -d --build
+# 接口:  http://127.0.0.1:8300  (Swagger 文档 /docs)
+# 停止:  docker compose -f docker-compose.cpu.yml down
+services:
+  card-correction-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+    image: card-correction:cpu
+    container_name: card-correction-cpu
+    environment:
+      DEVICE: cpu
+      NACOS_SERVER_ADDR: 192.168.2.61:8848
+      NACOS_SERVICE_NAME: card-correction
+      # 容器内 IP 对外不可达, 必须显式注册宿主机 IP
+      NACOS_REGISTER_IP: ${HOST_IP:-192.168.2.61}
+      NACOS_REGISTER_PORT: 8300
+    ports:
+      - "8300:8300"
+    # 如需让 service_config.json 修改在容器重建后保留, 取消下面 volumes 注释
+    # volumes:
+    #   - ./service_config.json:/app/service_config.json
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8300/health', timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s

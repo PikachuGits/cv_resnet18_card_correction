@@ -1,0 +1,73 @@
+# 票证检测矫正服务 - GPU 双卡版 (V100 x2 等)
+# 每张卡各跑一个实例, 分别映射宿主机 8300/8301 端口
+# 前置:  宿主机需安装 NVIDIA 驱动(建议 >= 550, 对应 CUDA 12.4) + nvidia-container-toolkit
+# 启动:  docker compose -f docker-compose.gpu2.yml up -d --build
+# 停止:  docker compose -f docker-compose.gpu2.yml down
+services:
+  card-correction-gpu0:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    image: card-correction:gpu
+    container_name: card-correction-gpu0
+    environment:
+      DEVICE: gpu:0
+      NACOS_SERVER_ADDR: 192.168.2.61:8848
+      NACOS_SERVICE_NAME: card-correction
+      NACOS_REGISTER_IP: ${HOST_IP:-192.168.2.61}
+      NACOS_REGISTER_PORT: 8300
+    ports:
+      - "8300:8300"
+    # volumes:
+    #   - ./service_config.json:/app/service_config.json
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]   # 只透传第 0 张卡
+              capabilities: [gpu]
+        limits:
+          memory: 8G
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8300/health', timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  card-correction-gpu1:
+    image: card-correction:gpu        # 复用 gpu0 构建好的镜像
+    container_name: card-correction-gpu1
+    environment:
+      # 注意: device_ids 只透传一张卡时, 容器内序号始终是 0,
+      # 绑定哪张物理卡由下方 device_ids 决定, 这里必须写 gpu:0
+      DEVICE: gpu:0
+      NACOS_SERVER_ADDR: 192.168.2.61:8848
+      NACOS_SERVICE_NAME: card-correction
+      NACOS_REGISTER_IP: ${HOST_IP:-192.168.2.61}
+      # 宿主机映射端口 8301, Nacos 上注册的也必须是 8301, 否则消费方连不通
+      NACOS_REGISTER_PORT: 8301
+    ports:
+      - "8301:8300"
+    # volumes:
+    #   - ./service_config.json:/app/service_config.json
+    restart: unless-stopped
+    depends_on:
+      - card-correction-gpu0          # 确保镜像已构建
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["1"]   # 只透传第 1 张卡
+              capabilities: [gpu]
+        limits:
+          memory: 8G
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8300/health', timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s

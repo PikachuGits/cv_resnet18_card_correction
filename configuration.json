@@ -1,0 +1,10 @@
+{
+    "task": "card-detection-correction",
+    "framework": "pytorch",
+    "K": 10,
+    "input_w": 768,
+    "input_h": 768,
+    "pipeline": {
+        "type": "resnet18-card-detection-correction"
+    }
+}
